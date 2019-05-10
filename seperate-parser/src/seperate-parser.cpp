@@ -175,7 +175,7 @@ pair <string, unsigned int> crawl(int index) {
 			return token;
 		}
 		if (megaToken[i + 1] == '{') {
-			token.second = i + 3; //these numbers are based on Normalize() function, number
+			token.second = i + 1; //these numbers are based on Normalize() function, number
 			return token;		  // of spaces between words is constant.
 		}
 	}
@@ -187,9 +187,15 @@ pair <vector <node>, int> parse(int index) {
 	node child;
 	string web = crawl(index).first;
 	int resIndex = crawl(index).second;
-	if (isMultiKeyword(resIndex)) {
+	while(true) {
+		if (megaToken[resIndex] == '{') {
+			pair <vector <node>, int> res = parse(resIndex + 1);
+			child.children = res.first;
+			index = res.second;
+		}
 
 	}
+
 
 	return children;
 }
