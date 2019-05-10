@@ -1,4 +1,3 @@
-//
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
@@ -10,39 +9,32 @@ using namespace std;
 
 class node {
 	public:
+		string id;
         string header;
-        string content;
         vector <node> children;
         node *parent;
-        void add(string str) {
-            content += str;
-        }
-        void addChild(node newChild) {
-            children.push_back(newChild);
+        void add(char ch) {
+            header += ch;
         }
 };
 
+bool isMultiKeyword(string);
 void clearExtraSpaces(string&);
-bool is_singleKeyword(string);
-bool is_doubleKeyword(string);
-bool is_variable(string);
 void initialize();
 void finalize();
 void normalize();
 void read();
 void exportNormal();
-void parse();
+vector <node> parse(int index, node&);
 void traverse(node);
 
 string megaToken = "";
 vector <string> input;
 
-string *singleKeywordList;
-string *doubleKeywordList;
-string *variableList;
+string *multiKeywordList;
 
-// main function node.
-node mainNode;
+// main program node.
+node program;
 
 int main() {
 	initialize();
@@ -50,17 +42,23 @@ int main() {
 	normalize();
 	clearExtraSpaces(megaToken);
 	exportNormal();
-	parse();
-	traverse(mainNode);
+	parse(0, program);
+	traverse(program);
 	finalize();
 }
 
 void initialize() {
-
+	multiKeywordList = new string[6];
+	multiKeywordList[0] = "do";
+	multiKeywordList[1] = "while";
+	multiKeywordList[2] = "for";
+	multiKeywordList[3] = "if";
+	multiKeywordList[4] = "else";
+	multiKeywordList[5] = "main";
 }
 
 bool valid(string str) {
-    for (int i = 0; i < str.size(); i++) {
+    for (unsigned int i = 0; i < str.size(); i++) {
         if (str[i] != '\t' || str[i] != ' ')
             return true;
     }
@@ -149,32 +147,57 @@ string toString(int num) {
     return numString;
 }
 
-// parses only code within main function. (FOR NOW..)
-void parse() {
-    mainNode.header = "0";
-    mainNode.content = "MAIN NODE";
-    string parsedToken = "";
-    for (unsigned int i = 0; i < megaToken.size(); i++) {
-        if (parsedToken.size() == 0 && megaToken[i] == ' ')
-            continue;
-        parsedToken += megaToken[i];
-        if (megaToken[i] == ';') {
-            i++;
-            node newNode;
-            newNode.header = mainNode.header + "." + toString(mainNode.children.size() + 1);
-            newNode.add(parsedToken);
-            parsedToken = "";
-            mainNode.children.push_back(newNode);
-        }
-    }
+int isMultiKeyword(string str) {
+	for (unsigned int i = 0; i < 5; i++) {
+		if (str == multiKeywordList[i])
+			return true;
+	}
+	return false;
+}
+vector <node> parse(int index, node &parent) {
+	vector <node> children;
+	node smallToken;
+	for (unsigned int i = index; i < megaToken.size(); i++) {
+		smallToken.add(megaToken[i]);
+		if (megaToken[i] == ';') {
+			children.push_back(smallToken);
+			smallToken.header = "";
+		}
+		if (megaToken[i] == '{') {
+			parse(index + 1, smallToken);
+		}
+		if (megaToken[i] == '}') {
+			return children;
+		}
+	}
+	return children;
 }
 
+// parses only code within main function. (FOR NOW..)
+//void parse() {
+//    mainNode.header = "0";
+//    mainNode.content = "MAIN NODE";
+//    string parsedToken = "";
+//    for (unsigned int i = 0; i < megaToken.size(); i++) {
+//        if (parsedToken.size() == 0 && megaToken[i] == ' ')
+//            continue;
+//        parsedToken += megaToken[i];
+//        if (megaToken[i] == ';') {
+//            i++;
+//            node newNode;
+//            newNode.header = mainNode.header + "." + toString(mainNode.children.size() + 1);
+//            newNode.add(parsedToken);
+//            parsedToken = "";
+//            mainNode.children.push_back(newNode);
+//        }
+//    }
+//}
+
 void traverse(node token) {
-    printf("NODE ID: %s\n", token.header.c_str());
-    printf("NODE CONTENT:\n%s\n", token.content.c_str());
+    printf("NODE CONTENT:\n%s\n", token.header.c_str());
     //printf("NODE PARENT ID: %d\n", token.parent->header.c_str()); off for now
-    printf("# OF CHILDREN: %d\n\n", token.children.size());
-    for (int i = 0; i < token.children.size(); i++) {
+    printf("# OF CHILDREN: %d\n\n", (int)token.children.size());
+    for (unsigned int i = 0; i < token.children.size(); i++) {
         traverse(token.children[i]);
     }
     return;
@@ -186,7 +209,5 @@ void exportNormal() {
 }
 
 void finalize() {
-	delete singleKeywordList;
-	delete doubleKeywordList;
-	delete variableList;
+	delete [] multiKeywordList;
 }
