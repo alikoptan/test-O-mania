@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <string>
 
+#include <map>
+
 using namespace std;
 
 class node {
@@ -41,18 +43,62 @@ string *multiKeywordList;
 // main program node.
 node program;
 
+map <string, vector <string>> adj;
+string s = "go ( x; do ( g; y; *) &)*";
+pair <vector <string>, int> testParse(int index) {
+	pair <vector <string>, int> childern;
+	string str;
+	for (unsigned int i = index; i < megaToken.size(); i++) {
+		str += megaToken[i];
+		if (str.back() == '{') {
+			cout << "started parsing for -" << str << "- at index " << i << '\n';
+			childern.first.push_back(str);
+			int stop = testParse(i + 1).second;
+			adj[str] = testParse(i + 1).first;
+			cout << "parsing stopped at " << stop << " and number of children of -" << str << "- is " << adj[str].size() << '\n';
+			cout << "children of " << str << "are:\n";
+			for (unsigned int j = 0; j < adj[str].size(); j++)
+				cout << "$ " << adj[str][j] << '\n';
+			i = stop;
+		}
+		if (str.back() == ';' || (str[str.size() - 1] == '>' && str[str.size() - 2] == 'h')) {
+			cout << "took -" << str << "-\n";
+			childern.first.push_back(str);
+			str = "";
+		}
+		if (str.back() == '}') {
+			cout << "reached end with str -" << str << "- will return end = " << i << '\n';
+			childern.second = i;
+			return childern;
+		}
+	}
+	return childern;
+}
+
+void dfs(string x, int lev) {
+	for (int i = 0; i < lev; i++)
+		cout << "->";
+	cout << x << '\n';
+	for (auto s : adj[x])
+		dfs(s, lev + 1);
+}
+
 int main() {
-	initialize();
 	read();
 	normalize();
 	clearExtraSpaces(megaToken);
-	exportNormal();
 
-	int index = 0;
-	program.header = "PROGRAM";
-	program.children = parse(index).first;
-	traverse(program);
-	finalize();
+	string p = "program";
+	adj[p] = testParse(0).first;
+	dfs("program", 0);
+//	initialize();
+//	exportNormal();
+//
+//	int index = 0;
+//	program.header = "PROGRAM";
+//	program.children = parse(index).first;
+//	traverse(program);
+//	finalize();
 }
 
 void initialize() {
@@ -197,7 +243,7 @@ pair <vector <node>, int> parse(int index) {
 	}
 
 
-	return children;
+	//return children;
 }
 
 //
