@@ -4,26 +4,29 @@
 #include <vector>
 #include <algorithm>
 #include <string>
-
 #include <map>
+#include <typeinfo>
 
 using namespace std;
 
 class node {
-	public:
-		string id;
-        string header;
-        vector <node> children;
-        node *parent;
-        void add(char ch) {
-            header += ch;
-        }
-        void destroy() {
-        	id = "";
-        	header = "";
-        	children.clear();
-        }
+public:
+	unsigned short id;
+	string header;
+	node *child;
+	virtual ~node() = default;
 };
+
+class condition : public node {
+public:
+	node *trueNode;
+	node *falseNode;
+	virtual ~condition() = default;
+};
+
+node entryPoint;
+
+
 
 bool isMultiKeyword(int);
 void clearExtraSpaces(string&);
@@ -42,37 +45,210 @@ string *multiKeywordList;
 
 // main program node.
 node program;
-
 map <string, vector <string>> adj;
-string s = "go ( x; do ( g; y; *) &)*";
+
 pair <vector <string>, int> testParse(int index) {
 	pair <vector <string>, int> childern;
 	string str;
 	for (unsigned int i = index; i < megaToken.size(); i++) {
 		str += megaToken[i];
 		if (str.back() == '{') {
-			cout << "started parsing for -" << str << "- at index " << i << '\n';
 			childern.first.push_back(str);
 			int stop = testParse(i + 1).second;
 			adj[str] = testParse(i + 1).first;
-			cout << "parsing stopped at " << stop << " and number of children of -" << str << "- is " << adj[str].size() << '\n';
-			cout << "children of " << str << "are:\n";
-			for (unsigned int j = 0; j < adj[str].size(); j++)
-				cout << "$ " << adj[str][j] << '\n';
 			i = stop;
 		}
 		if (str.back() == ';' || (str[str.size() - 1] == '>' && str[str.size() - 2] == 'h')) {
-			cout << "took -" << str << "-\n";
 			childern.first.push_back(str);
 			str = "";
 		}
 		if (str.back() == '}') {
-			cout << "reached end with str -" << str << "- will return end = " << i << '\n';
 			childern.second = i;
 			return childern;
 		}
 	}
 	return childern;
+}
+
+node* createStatment(string s)
+{
+	node *ret = new node();
+	//TODO : implement generate id
+	ret->header = s;
+	return ret;
+}
+
+condition* createCondition(string s)
+{
+	condition *ret = new condition();
+	//TODO : implement generate id
+	ret->header = s;
+	return ret;
+}
+
+vector<node*> parseFor(string s)
+{
+	int begin = s.find('(');
+	int end = s.find(')');
+
+	vector<node*> ret;
+	string initialize;
+	string condition;
+	string pre;
+
+	int semi = 0;
+	string cur;
+	for(int i = begin + 1; i < end; i++)
+	{
+		cur += s[i];
+		if(s[i] == ';')
+		{
+			if(semi == 0)
+				initialize = cur;
+			else if(semi == 1)
+				condition = cur;
+			cur = "";
+			semi++;
+		}
+	}
+	pre = cur;
+	ret.push_back(createStatment(initialize));
+	ret.push_back(createCondition(condition));
+	ret.push_back(createStatment(pre));
+	return ret;
+}
+
+node* getLastChild(node* node)
+{
+	if(node->child == nullptr)
+		return node;
+	else
+		return getLastChild(node->child);
+}
+
+void dfs(node *node)
+{
+    if(node->child == nullptr)
+        return;
+    condition *cond = dynamic_cast<condition*>(node);
+    if(cond != nullptr)
+    {
+        dfs(cond->trueNode);
+        dfs(cond->child);
+    }
+    else
+        dfs(node->child);
+}
+
+node* parse(string s)
+{
+    if(s.size() == 0)
+        return nullptr;
+	if(s.size() >= 3 && s.substr(0, 3) == "for")
+	{
+		int end = s.find(')');
+		string forStatment;
+		string insideFor;
+		string rest;
+
+		int endForIndex = s.find(')');
+		forStatment = s.substr(0, endForIndex + 1);
+		vector<node*> forNodes = parseFor(forStatment);
+
+		//b3d l for hyb2a fiih '{'
+		int endInsideForIndex;
+		int open = 1;
+		for(int i = endForIndex + 2; i < s.size(); i++)
+		{
+			if(s[i] == '{')
+				open++;
+			else if(s[i] == '}')
+				open--;
+			if(open == 0){
+				endInsideForIndex = i;
+				break;
+			}
+			insideFor += s[i];
+		}
+
+		node* insideForNode = parse(insideFor);
+
+		node* lastInsideFor = getLastChild(insideForNode);
+
+		//initialize then check condition
+		forNodes[0]->child = forNodes[1];
+		//after inside for return to post conditon
+		lastInsideFor->child = forNodes[2];
+		//after post condition return to check condition
+		forNodes[2]->child = forNodes[1];
+
+		//if true ad5ol loop
+		condition* cond = dynamic_cast<condition*>(forNodes[1]);
+		cond->trueNode = insideForNode;
+
+
+		rest = s.substr(endInsideForIndex + 1);
+		node* restNode = parse(rest);
+
+		//if false a5rog bra l loop
+		cond->falseNode = cond->child = restNode;
+		return forNodes[0];
+	}
+	else if(s.size() >= 2 && s.substr(0, 2) == "if") {
+		int start = s.find('(');
+		int end = s.find(')');
+		string statementBody = s.substr(start + 1, end - start - 1);
+		string insideIf;
+		condition *ifBody = createCondition(statementBody);
+
+		int endInsideIfIndex;
+		int open = 1;
+		for(int i = end + 2; i < s.size(); i++) {
+			if(s[i] == '{')
+				open++;
+			else if(s[i] == '}')
+				open--;
+			if(open == 0){
+				endInsideIfIndex = i;
+					break;
+				}
+			insideIf += s[i];
+		}
+		node *insideIfNode = parse(insideIf);
+		ifBody->trueNode = insideIfNode;
+		s = s.substr(endInsideIfIndex + 1);
+
+		if (s.size() >= 4 && s.substr(0, 4) == "else") {
+			string insideElse;
+			int endInsideElseIndex;
+			int open = 1;
+			for (int i = 6; i < s.size(); i++) {
+				if(s[i] == '{')
+					open++;
+				else if(s[i] == '}')
+					open--;
+				if(open == 0) {
+					endInsideElseIndex = i;
+					break;
+				}
+				insideElse += s[i];
+			}
+			node *insideElseNode = createStatment(insideElse);
+			ifBody->falseNode = insideElseNode;
+			s = s.substr(endInsideElseIndex + 1);
+		}else {
+			ifBody->falseNode = nullptr;
+		}
+		ifBody->child = parse(s);
+		return ifBody;
+	}
+	else
+	{
+		int nextStatmentEnd = s.find(';');
+		node* statement = createStatment(s.substr(0, nextStatmentEnd));
+		statement->child = parse(s.substr(nextStatmentEnd + 1));
+		return statement;
+	}
 }
 
 void dfs(string x, int lev) {
@@ -84,13 +260,23 @@ void dfs(string x, int lev) {
 }
 
 int main() {
-	read();
+	/*read();
 	normalize();
-	clearExtraSpaces(megaToken);
+	clearExtraSpaces(megaToken);*/
 
-	string p = "program";
-	adj[p] = testParse(0).first;
-	dfs("program", 0);
+	string test = "for(int i = 0; i < 5; i++){int x;x++;}int x = 0;";
+	node* program = parse(test);
+	dfs(program);
+//
+//	string p = "program";
+//	adj[p] = testParse(0).first;
+//
+//
+//	for (auto x : adj) {
+//		cout <<
+//
+//	}
+//	dfs("program", 0);
 //	initialize();
 //	exportNormal();
 //
@@ -108,7 +294,7 @@ void initialize() {
 	multiKeywordList[2] = "for";
 	multiKeywordList[3] = "if";
 	multiKeywordList[4] = "else";
-	multiKeywordList[5] = "main";
+	multiKeywordList[5] = "main()";
 }
 
 bool valid(string str) {
@@ -214,7 +400,7 @@ bool isMultiKeyword(int index) {
 
 pair <string, unsigned int> crawl(int index) {
 	pair <string, int> token;
-	for (int i = index; i < megaToken.size(); i++) {
+	for (unsigned int i = index; i < megaToken.size(); i++) {
 		token.first += megaToken[i];
 		if (megaToken[i] == ';' || (megaToken[i] == '>' && megaToken[i - 1] == 'h')) {
 			token.second = i + 2; //jump 4 lines.
@@ -227,71 +413,15 @@ pair <string, unsigned int> crawl(int index) {
 	}
 	return token;
 }
-
-pair <vector <node>, int> parse(int index) {
-	vector <node> children;
-	node child;
-	string web = crawl(index).first;
-	int resIndex = crawl(index).second;
-	while(true) {
-		if (megaToken[resIndex] == '{') {
-			pair <vector <node>, int> res = parse(resIndex + 1);
-			child.children = res.first;
-			index = res.second;
-		}
-
-	}
-
-
-	//return children;
-}
-
 //
-//pair <vector <node>, int> parse(int index) {
-//	cout << "PARSING: " << index << '\n';
-//	vector <node> children;
-//	node child;
-//	for (unsigned int i = index; i < megaToken.size(); i++) {
-//		child.add(megaToken[i]);
-//		cout << "index = " << i << " " << "child got " << megaToken[i] << " added" << '\n';
-//		if (isMultiKeyword(i) == true) {
-//			cout << "I have found one here\n";
-//			for (unsigned int j = i + 1; j < megaToken.size(); j++) {
-//				child.add(megaToken[j]);
-//				cout << "index = " << j << " child got " << megaToken[j] << " added\n";
-//				if (megaToken[j + 1] == '{') {
-//					i = j + 3;
-//					child.children = parse(i).first;
-//					i = parse(i).second;
-//				}
-//			}
-//		}
-//
-//		if (megaToken[i + 1] == '}') {
-//			cout << "reached end of function / scope\n";
-//			return make_pair(children, i + 3);
-//		}
-//
-//		// special cases for header .h files
-//		if ((megaToken[i] == '>' && megaToken[i - 1] == 'h') || megaToken[i] == ';') {
-//			cout << "reached a statment / header file\n";
-//			i++;
-//			children.push_back(child);
-//			child.destroy();
-//		}
-//		index = i;
-//	}
-//	return make_pair(children, index);
+//void traverse(node token) {
+//    printf("NODE CONTENT: %s\n", token.header.c_str());
+//    printf("# OF CHILDREN: %d\n\n", (int)token.children.size());
+//    for (unsigned int i = 0; i < token.children.size(); i++) {
+//        traverse(token.children[i]);
+//    }
+//    return;
 //}
-
-void traverse(node token) {
-    printf("NODE CONTENT: %s\n", token.header.c_str());
-    printf("# OF CHILDREN: %d\n\n", (int)token.children.size());
-    for (unsigned int i = 0; i < token.children.size(); i++) {
-        traverse(token.children[i]);
-    }
-    return;
-}
 
 //TODO: after wrapping up, exportNormal should write to file.
 void exportNormal() {
